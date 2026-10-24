@@ -7,12 +7,15 @@ not viable on Kaggle's ~30 GPU-h/week quota. This experiment tests whether
 FP16 mixed precision fixes that, without breaking stability, checkpoints,
 or the FP32 baseline.
 
-## Status: IMPLEMENTED — GPU measurement NOT RUN
+## Status: RUN — real Kaggle GPU results below (section 7)
 
-Implementation, CPU tests, and the Kaggle benchmark notebook are complete.
-**No GPU numbers are claimed below.** The results section is marked NOT RUN
-and must be filled in from a real Kaggle run. The decision at the end is
-therefore CONDITIONAL, not a pass: AMP passes only when measured.
+Run 2026-10-24 on 2× Tesla T4 (single-GPU benchmark runs), notebook pinned
+to GitHub snapshot `7d3e58ff` (the AMP implementation). Raw results
+archived at `experiments/amp_bench_results.json` (as uploaded by Mohnish)
+and independently recomputed (pin, config equality, speedup, both MFUs,
+projection, budget arithmetic — all agree). **Decision: CONDITIONAL PASS**
+(section 8). FP32 losses reproduce EXP-005 Run B bit-for-bit, which
+cross-validates both runs.
 
 ## 1. What changed
 
@@ -150,40 +153,59 @@ FP16/FP32 ratio is unaffected (documented in the code, not hidden).
   planning figure (overheads + a partial failed/repeated run), all labeled
   estimates.
 
-## 7. GPU results — NOT RUN (fill in after Mohnish's run)
+## 7. GPU results — RUN 2026-10-24 (Kaggle, real hardware)
 
 | item | value |
 |---|---|
-| GPU model / count | _pending_ |
-| FP32 steady tok/s, MFU | _pending_ |
-| FP16 steady tok/s, MFU | _pending_ |
-| MEASURED speedup | _pending_ |
-| FP16 skipped steps / non-finite counts / scaler scale | _pending_ |
-| AMP resume test | _pending_ |
-| 125M/2.5B projection from measured AMP | _pending_ |
+| GPU model / count | 2× Tesla T4, 15,636 MB VRAM each (benchmark runs used 1 GPU) |
+| Software | torch 2.11.0+cu128, CUDA 12.8, Python 3.13.15 |
+| Commit pin | pinned = actual HEAD = `7d3e58ff` (AMP implementation) |
+| FP32 steady tok/s, MFU | 15,204 tok/s, MFU 33.2% (vs 8.1 TFLOPS FP32 peak; steady excludes warmup, hence higher than EXP-005's 30.9% overall) |
+| FP16 steady tok/s, MFU | 39,356 tok/s, MFU 10.7% (vs 65 TFLOPS FP16 peak) |
+| MEASURED speedup | **2.59x** (steady tok/s ratio; not assumed 8x) |
+| FP32 losses | train 0.17259, val 0.17555 — bit-identical to EXP-005 Run B |
+| FP16 losses | train 0.16999, val 0.17371 (train/val ratio 1.02; finite throughout) |
+| FP16 skipped steps / non-finite counts / scaler scale | 1/300 skipped (0.33%), 0 non-finite losses, 1 non-finite grad event (caught and skipped by design), final scale 32,768 (halved once from 65,536 after the single event, no repeated overflow) |
+| FP16 peak memory | 2,554 MB allocated (vs FP32 3,488 MB) |
+| AMP resume test | PASS: 20 → 40 steps fresh-process resume, scaler restored, cross-precision resume refused |
+| 125M/2.5B projection from measured AMP | 75.3 h base, 86.6 h with 15% overheads, 112.9 h planning (+50% incl. a partial failed run) |
 
-## 8. Decision: CONDITIONAL
+Why FP16 MFU (10.7%) is far below FP32 MFU (33.2%) while still 2.59x
+faster: only matmuls run at tensor-core speed; norms, softmax, loss,
+optimizer, and casts stay FP32, and at 25M the model is small enough that
+kernel-launch and non-matmul overhead dominate (Amdahl effect). At 125M
+the matmul fraction rises, so the projection may be pessimistic — but
+that is unmeasured and NOT claimed; the projection uses the measured
+25M throughput scaled by FLOPs/token ratio, with the scaling caveat.
 
-Implementation and all CPU-verifiable gates pass: FP32 baseline
-bit-identical, precision validation and resume rejection tested,
-checkpoint scaler plumbing tested, DDP rank-0 writes tested, fair
-benchmark notebook built and validated (15 cells, all compile).
+## 8. Decision: CONDITIONAL PASS
 
-**AMP itself does NOT pass yet** — that verdict requires the Kaggle
-measurement. AMP passes only if, on the same T4: steady FP16 tok/s
-materially exceeds FP32 (target: the projection returns inside the
-~30 GPU-h/week-feasible band), losses stay finite, skipped steps are a
-small minority, and the fresh-process resume test passes. If FP16 is
-unstable (repeated overflows, most steps skipped) or barely faster, the
-verdict is FAIL and the M5 plan must change (smaller model, fewer tokens,
-or a different compute strategy) — not quietly proceed at FP32.
+**AMP as a mechanism: PASS.** On the same T4, same config, FP16 trains
+2.59x faster than FP32 (39,356 vs 15,204 steady tok/s), losses track FP32
+closely (0.170/0.174 vs 0.173/0.176), only 1 of 300 steps skipped, no
+repeated overflow, memory down 27%, and fresh-process resume with scaler
+restore works (plus cross-precision resume is refused as designed).
+
+**M5 pretraining: still BLOCKED, on a budget decision, not a technical
+one.** The projection improved 2.9x (218 h FP32 → 75.3 h FP16 base,
+112.9 h planning), but 75–113 h is NOT the original 23–32 h band: it is
+roughly 2.5–4 weeks of Kaggle's ~30 GPU-h/week quota, split across
+~7–10 sessions of ≤12 h. Resume is proven, so splitting is safe — but
+the commitment is real and must be accepted explicitly, not drifted into.
+
+Remaining gates for a pretraining go: (a) Mohnish accepts the 75–113 h
+budget (or scopes down: fewer tokens, smaller first model); (b) corpus
+decision (the-stack-v2 gated terms need his own HF acceptance, or the
+codeparrot-clean fallback); (c) evaluation gates unchanged
+(FORGE-Heldout protected; no scores exist yet and none are claimed).
 
 ## 9. Gates (unchanged)
 
-- **M5 pretraining: BLOCKED.** (a) AMP measurement pending (this
-  experiment). (b) Corpus decision still open (the-stack-v2 gated terms
-  need Mohnish's own HF acceptance, or the codeparrot-clean fallback).
-  (c) Evaluation gates: FORGE-Heldout stays protected; no scores exist
-  yet and none are claimed.
+- **M5 pretraining: BLOCKED.** (a) Budget decision pending (75–113 h
+  accepted, or scope down). (b) Corpus decision still open (the-stack-v2
+  gated terms need Mohnish's own HF acceptance, or the codeparrot-clean
+  fallback). (c) Evaluation gates: FORGE-Heldout stays protected; no
+  scores exist yet and none are claimed.
 - No pretraining started; no GPU results fabricated; no unexecuted test
-  described as passed.
+  described as passed. All GPU numbers above are measured and
+  independently recomputed.

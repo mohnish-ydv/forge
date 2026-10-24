@@ -1,0 +1,111 @@
+{
+  "actual_head": "7d3e58ff4eb48853e2107d74ab4a8ad2d8874f09",
+  "comparison": {
+    "fp16_nonfinite_grads": 1,
+    "fp16_nonfinite_losses": 0,
+    "fp16_skipped_steps": 1,
+    "mfu_fp16_vs_fp16_peak": 0.1072,
+    "mfu_fp32_vs_fp32_peak": 0.3322,
+    "note": "speedup is MEASURED (steady tok/s ratio). It is not 8x by assumption: 65/8.1 is a peak ratio for pure matmul, not a training speedup.",
+    "scope": "per-GPU (single-GPU runs; aggregate == per-GPU)",
+    "steady_speedup_fp16_vs_fp32": 2.589,
+    "steady_tok_per_s_fp16": 39355.8,
+    "steady_tok_per_s_fp32": 15204.0
+  },
+  "config_common": {
+    "batch": 16,
+    "d_model": 512,
+    "lr": 0.0003,
+    "n_heads": 8,
+    "n_kv_heads": 4,
+    "n_layers": 8,
+    "optimizer": "AdamW",
+    "params_exact": 25305600,
+    "schedule": "cosine T_max=300",
+    "seq": 512,
+    "steps": 300,
+    "warmup_steps": 20,
+    "weight_decay": 0.1
+  },
+  "hardware": {
+    "cuda_torch": "12.8",
+    "fp16_peak_flops_used": 65000000000000.0,
+    "fp32_peak_flops_used": 8100000000000.0,
+    "gpu_count": 2,
+    "gpu_names": [
+      "Tesla T4",
+      "Tesla T4"
+    ],
+    "python": "3.13.15",
+    "torch": "2.11.0+cu128",
+    "vram_total_mb": [
+      15636.0,
+      15636.0
+    ]
+  },
+  "methodology": "measured: steady_tok_per_s (post-warmup, CUDA-synchronized), elapsed, peak allocated+reserved mem, losses, skipped steps, non-finite counts, scaler scale. estimated: FLOPs/token = 6N + 12*L*d*S (+-10% band). MFU vs the peak of the precision actually used. scope: per-GPU = aggregate (single-GPU runs).",
+  "notebook": "forge_m6_amp_bench",
+  "pinned_commit": "7d3e58ff4eb48853e2107d74ab4a8ad2d8874f09",
+  "projection_125m_2p5B": {
+    "assumptions": "125M config (d=768, L=18) at S=512, same FLOPs/token methodology as EXP-005; setup/validation/checkpointing ~15%; planning figure adds a partial failed/repeated run (~35% of base).",
+    "caveat": "25M->125M scaling is approximate: attention fraction, memory behavior, and long-run effects differ. Treat as an estimate with a band, not a measurement.",
+    "hours_base_from_measured_amp": 75.3,
+    "hours_planning_50pct": 112.9,
+    "hours_with_overheads_15pct": 86.6
+  },
+  "resume_test": {
+    "mismatch_rejected": true,
+    "precision": "fp16",
+    "scaler_final_scale": 32768.0,
+    "scaler_restored": true,
+    "status": "ok",
+    "steps": 40
+  },
+  "runs": {
+    "fp16": {
+      "ddp": false,
+      "deterministic_algos": true,
+      "elapsed_s": 62.77,
+      "final_train_loss": 0.16998934745788574,
+      "final_val_loss": 0.173713322977225,
+      "nonfinite_grads": 1,
+      "nonfinite_losses": 0,
+      "param_hash": 8506.489195787624,
+      "peak_gpu_mem_mb": 2554.1,
+      "peak_gpu_mem_reserved_mb": 2705.3,
+      "precision": "fp16",
+      "scaler_final_scale": 32768.0,
+      "seed": 42,
+      "skipped_steps": 1,
+      "steady_tok_per_s": 39355.8,
+      "steps": 300,
+      "tok_per_s": 39149.5,
+      "tokens_seen": 2457600,
+      "warmup_steps": 20,
+      "world_size": 1
+    },
+    "fp32": {
+      "ddp": false,
+      "deterministic_algos": true,
+      "elapsed_s": 161.52,
+      "final_train_loss": 0.17258894443511963,
+      "final_val_loss": 0.1755549689133962,
+      "nonfinite_grads": 0,
+      "nonfinite_losses": 0,
+      "param_hash": 8517.358819278452,
+      "peak_gpu_mem_mb": 3487.5,
+      "peak_gpu_mem_reserved_mb": 3709.9,
+      "precision": "fp32",
+      "scaler_final_scale": null,
+      "seed": 42,
+      "skipped_steps": 0,
+      "steady_tok_per_s": 15204.0,
+      "steps": 300,
+      "tok_per_s": 15215.0,
+      "tokens_seen": 2457600,
+      "warmup_steps": 20,
+      "world_size": 1
+    }
+  },
+  "status": "ok"
+}
