@@ -201,7 +201,9 @@ volume, only if the full-corpus measurement contradicts §2.4.
 
 ## 3. Larger-model pilot (prepared, NOT RUN)
 
-Notebook: `notebooks/forge_m7_pilot.ipynb` (pin filled after push; all
+Notebook: `notebooks/forge_m7_pilot.ipynb` (pinned to GitHub commit
+`04c5050a`, which contains the AMP training code, the pipeline, and the
+heldout benchmark; all
 code cells compile; corpus-prep cell logic simulated locally on 200 rows:
 112 retained, 0 secret-kept, 0 heldout hits, train.bin built correctly).
 
