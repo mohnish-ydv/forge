@@ -7,6 +7,11 @@ correctly — NOT to claim coding capability.
 
 Checkpoint format (v1):
   {model, optimizer, scheduler, step, tokens_seen, config, rng, version}
+  AMP runs additionally store `scaler` (GradScaler state_dict) and record
+  `precision` inside config["train"] (argparse captures it automatically).
+  v1 checkpoints without those keys load as FP32 (backward compatible);
+  resuming across precisions, or AMP-resuming from a scaler-less checkpoint,
+  is a hard error, never a silent change of experiment.
 - Atomic write: save to tmp file, fsync, os.replace.
 - Rotation: keep last `keep_last` validated checkpoints; the previous
   known-good checkpoint is never deleted before the new one validates.
@@ -70,6 +75,14 @@ def get_args():
                         "torchrun --nproc_per_node=N. Single-process path is "
                         "unchanged when off (M3 baseline preserved). DDP path is "
                         "NOT covered by the M3 bit-identical guarantee.")
+    p.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16"],
+                   help="Training precision: fp32 (default, M3 baseline) or "
+                        "fp16 AMP (CUDA only: autocast + GradScaler). CPU FP16 "
+                        "is rejected, not silently emulated.")
+    p.add_argument("--warmup-steps", type=int, default=0,
+                   help="Steps excluded from steady-state throughput measurement "
+                        "(benchmarking only; does not change training). "
+                        "steady_tok_per_s is None when warmup >= steps.")
     return p.parse_args()
 
 
@@ -95,7 +108,8 @@ def _set_rng_states(st):
     random.setstate(st["python"])
 
 
-def save_checkpoint(path, model, optimizer, scheduler, step, tokens_seen, config):
+def save_checkpoint(path, model, optimizer, scheduler, step, tokens_seen, config,
+                    scaler=None):
     """Atomic, validated save. Raises on failure (never partial)."""
     tmp = path + ".tmp"
     payload = {
@@ -107,6 +121,8 @@ def save_checkpoint(path, model, optimizer, scheduler, step, tokens_seen, config
         "tokens_seen": tokens_seen,
         "config": config,
         "rng": _rng_states(),
+        # AMP only: None for FP32 runs (v1-compatible shape).
+        "scaler": scaler.state_dict() if scaler is not None else None,
     }
     torch.save(payload, tmp)
     # Validate the new checkpoint BEFORE it replaces anything: reload and
@@ -116,13 +132,37 @@ def save_checkpoint(path, model, optimizer, scheduler, step, tokens_seen, config
     assert probe["step"] == step, "step mismatch in written checkpoint"
     for k in ("model", "optimizer", "config", "rng"):
         assert k in probe, f"missing key {k}"
+    if scaler is not None:
+        assert probe.get("scaler") is not None, "scaler state missing in written checkpoint"
     os.replace(tmp, path)  # atomic on POSIX
 
 
-def load_checkpoint(path, model, optimizer=None, scheduler=None):
+def check_resume_precision(stored_precision, requested_precision, has_scaler_state):
+    """Pure resume-compatibility decision (unit-testable without CUDA).
+
+    stored_precision: from the checkpoint's config["train"] ("fp32" when the
+    key is absent, i.e. v1 checkpoints). Raises RuntimeError on any
+    incompatible combination; returns None when the resume may proceed.
+    """
+    if stored_precision != requested_precision:
+        raise RuntimeError(
+            f"Precision mismatch on resume: checkpoint used {stored_precision}, "
+            f"current run requests {requested_precision}. Refusing to resume across "
+            f"precisions (use a fresh --ckpt-dir for the new precision).")
+    if requested_precision == "fp16" and not has_scaler_state:
+        raise RuntimeError(
+            "AMP resume requires GradScaler state in the checkpoint, but none "
+            "was found. Refusing to resume with a fresh scaler (it would "
+            "silently change the experiment).")
+    return None
+
+
+def load_checkpoint(path, model, optimizer=None, scheduler=None, scaler=None):
     """Load and apply checkpoint. Raises FileNotFoundError / RuntimeError
     on missing/corrupt files — the caller must NOT fall back to a fresh run
-    silently."""
+    silently. When `scaler` is given and the checkpoint carries scaler state,
+    it is restored; a scaler-less (v1/FP32) checkpoint leaves the scaler
+    untouched, and the caller decides whether that is compatible."""
     import torch
     if path is None or not os.path.exists(path):
         raise FileNotFoundError(f"checkpoint not found: {path}")
@@ -140,6 +180,8 @@ def load_checkpoint(path, model, optimizer=None, scheduler=None):
         optimizer.load_state_dict(ckpt["optimizer"])
     if scheduler is not None and ckpt.get("scheduler") is not None:
         scheduler.load_state_dict(ckpt["scheduler"])
+    if scaler is not None and ckpt.get("scaler") is not None:
+        scaler.load_state_dict(ckpt["scaler"])
     _set_rng_states(ckpt["rng"])
     return ckpt
 
@@ -194,15 +236,22 @@ def make_batches(ids, seq_len, batch_size, seed):
 
 
 @torch.no_grad()
-def evaluate(model, batches, device):
+def evaluate(model, batches, device, amp=False):
     import torch
+    from contextlib import nullcontext
+    # Same autocast policy as training (fp16 matmuls, fp32 loss) so val loss
+    # is comparable across precisions. amp=False -> nullcontext: the FP32
+    # path is exactly unchanged.
+    ctx = (torch.autocast("cuda", dtype=torch.float16, enabled=True)
+           if (amp and device.type == "cuda") else nullcontext())
     model.eval()
     total, n = 0.0, 0
     for b in batches:
         b = b.to(device)
         x = b[:, :-1]
         y = b[:, 1:]
-        _, loss = model(x, y)
+        with ctx:
+            _, loss = model(x, y)
         total += loss.item()
         n += 1
     model.train()
@@ -265,8 +314,19 @@ def main():
     device = torch.device(dev)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("--device cuda requested but torch reports no CUDA device")
+    if args.warmup_steps < 0:
+        raise RuntimeError("--warmup-steps must be >= 0")
+    precision = args.precision.lower()
+    # AMP is a CUDA-only path. CPU FP16 exists in torch but is not a
+    # supported equivalent (no tensor-core acceleration, different numerics),
+    # so reject it loudly instead of benchmarking something meaningless.
+    if precision == "fp16" and device.type != "cuda":
+        raise RuntimeError(
+            "--precision fp16 requires a CUDA device; on CPU use --precision fp32. "
+            "CPU FP16 is not a supported equivalent to CUDA AMP.")
+    amp = precision == "fp16"
     if is_main:
-        log(f"device={device}", logf)
+        log(f"device={device} precision={precision}", logf)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     try:
@@ -300,23 +360,59 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=t_max)
 
+    # --- AMP setup (fp16 only; FP32 path keeps scaler=None throughout) ---
+    # autocast policy (torch defaults): linear/matmul in fp16, softmax and
+    # cross-entropy in fp32, master weights stay fp32. RMSNorm is computed in
+    # fp32 explicitly in model.py. RoPE freqs are fp32; the bounded [-1,1]
+    # rotation products under autocast run in fp16 without overflow risk.
+    from contextlib import nullcontext
+    amp_ctx = (torch.autocast("cuda", dtype=torch.float16, enabled=True)
+               if (amp and device.type == "cuda") else nullcontext())
+    scaler = torch.amp.GradScaler("cuda") if amp else None
+    # Skipped-step counting: GradScaler does not report skips, but it calls
+    # optimizer.step() ONLY when no inf/nan was found. Wrapping step() with a
+    # counter therefore measures skips exactly, with no private APIs.
+    step_calls = []
+    if scaler is not None:
+        _orig_step = opt.step
+
+        def _counting_step(*a, **k):
+            step_calls.append(1)
+            return _orig_step(*a, **k)
+
+        opt.step = _counting_step
+
     start_step, tokens_seen = 0, 0
     if args.resume:
         ckpt_path = latest_checkpoint(args.ckpt_dir)
         # FAIL SAFE: missing checkpoint with --resume is a hard error,
         # never a silent fresh run.
-        ckpt = load_checkpoint(ckpt_path, model, opt, sched)
+        ckpt = load_checkpoint(ckpt_path, model, opt, sched, scaler=scaler)
         old_t_max = ckpt["config"]["train"].get("t_max") or ckpt["config"]["train"]["steps"]
         if old_t_max != t_max:
             raise RuntimeError(
                 f"T_max mismatch on resume: checkpoint used T_max={old_t_max}, "
                 f"current run has T_max={t_max}. Refusing to resume with a "
                 f"different LR schedule.")
+        # Precision compatibility: a checkpoint's precision is part of the
+        # experiment. v1 checkpoints carry no precision key and are FP32.
+        stored_precision = ckpt["config"]["train"].get("precision", "fp32")
+        check_resume_precision(stored_precision, precision, ckpt.get("scaler") is not None)
         start_step, tokens_seen = ckpt["step"], ckpt["tokens_seen"]
         log(f"resumed from {ckpt_path} at step {start_step}", logf)
+        if precision == "fp16":
+            log(f"resumed scaler scale={scaler.get_scale()}", logf)
 
     t0 = time.time()
     train_losses = []
+    # Steady-state throughput: warmup steps (allocator/cudnn warm-up, first
+    # val pass) are excluded. Tokens at the measurement boundary are recorded
+    # so the count is exact under resume and DDP. Val passes inside the
+    # measured region are identical for both precisions, so the FP16/FP32
+    # ratio is unaffected (documented, not hidden).
+    t_measure = t0 if args.warmup_steps == 0 else None
+    measure_tokens = tokens_seen * world_size if args.warmup_steps == 0 else 0
+    skipped_steps, nonfinite_losses, nonfinite_grads = 0, 0, 0
     # DDP: each rank trains on a strided shard of the deterministic batches.
     # DDP averages gradients across ranks, so one optimizer step == one step
     # on the concatenated global batch.
@@ -326,17 +422,47 @@ def main():
         b = rank_batches[step % len(rank_batches)].to(device)
         x, y = b[:, :-1], b[:, 1:]
         assert x.shape == (args.batch_size, args.seq_len), "batch shape drift"
-        _, loss = model(x, y)
-        assert torch.isfinite(loss).item(), f"non-finite loss at step {step}"
+        with amp_ctx:
+            _, loss = model(x, y)
+        loss_val = loss.item()
+        if scaler is not None:
+            # AMP: a non-finite loss yields inf grads, which the scaler skips
+            # safely. Count it (benchmark honesty) instead of crashing: the
+            # gate is "does the scaler repeatedly overflow", not "never inf".
+            if not math.isfinite(loss_val):
+                nonfinite_losses += 1
+        else:
+            assert math.isfinite(loss_val), f"non-finite loss at step {step}"
         opt.zero_grad(set_to_none=True)
-        loss.backward()
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-        assert torch.isfinite(grad_norm).item(), f"non-finite grad norm at step {step}"
-        opt.step()
+        if scaler is not None:
+            # Docs order: scale -> backward -> unscale -> clip -> step -> update.
+            # Clipping runs on UNSCALED grads. The scheduler advances even on
+            # a skipped step (docs pattern); skipped_steps is reported so the
+            # effect is visible, not hidden.
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+            if not math.isfinite(grad_norm.item()):
+                nonfinite_grads += 1
+            step_calls.clear()
+            scaler.step(opt)
+            scaler.update()
+            skipped_steps += 0 if step_calls else 1
+        else:
+            loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+            assert torch.isfinite(grad_norm).item(), f"non-finite grad norm at step {step}"
+            opt.step()
         sched.step()
         step1 = step + 1
         tokens_seen += args.batch_size * args.seq_len
-        train_losses.append(loss.item())
+        train_losses.append(loss_val)
+
+        if t_measure is None and args.warmup_steps > 0 and step1 == args.warmup_steps:
+            if device.type == "cuda":
+                torch.cuda.synchronize()
+            t_measure = time.time()
+            measure_tokens = tokens_seen * world_size
 
         if ddp and (step1 % args.log_every == 0 or step1 == args.steps):
             # average the logged loss across ranks (in-place on a tensor)
@@ -353,21 +479,33 @@ def main():
             log(f"step {step1}/{args.steps} loss={log_loss:.4f} "
                 f"tok={tokens_seen * world_size} t={el:.1f}s tok/s={tps:.0f}", logf)
         if is_main and (step1 % args.val_every == 0 or step1 == args.steps):
-            vl = evaluate(model.module if ddp else model, val_batches, device)
+            vl = evaluate(model.module if ddp else model, val_batches, device, amp=amp)
             log(f"  val_loss={vl:.4f}", logf)
         if is_main and (step1 % args.ckpt_every == 0 or step1 == args.steps):
             path = os.path.join(args.ckpt_dir, f"ckpt_{step1:06d}.pt")
             cfg = {"model": mcfg.__dict__, "train": vars(args)}
             save_checkpoint(path, model.module if ddp else model, opt, sched,
-                            step1, tokens_seen * world_size, cfg)
+                            step1, tokens_seen * world_size, cfg, scaler=scaler)
             rotate_checkpoints(args.ckpt_dir, args.keep_last)
             log(f"  checkpoint -> {path} (validated, rotated)", logf)
 
+    if device.type == "cuda":
+        torch.cuda.synchronize()
     el = time.time() - t0
+    # Steady-state throughput over the post-warmup region only. None when the
+    # run never crossed the warmup boundary (warmup >= steps, or a resume
+    # that started past it) — reported as null, never faked from the full run.
+    if t_measure is not None:
+        steady_el = time.time() - t_measure
+        steady_tokens = tokens_seen * world_size - measure_tokens
+        steady_tps = (round(steady_tokens / max(steady_el, 1e-9), 1)
+                      if steady_tokens > 0 else None)
+    else:
+        steady_tps = None
     if is_main:
         summary = {
             "steps": args.steps, "final_train_loss": train_losses[-1],
-            "final_val_loss": evaluate(model.module if ddp else model, val_batches, device),
+            "final_val_loss": evaluate(model.module if ddp else model, val_batches, device, amp=amp),
             "tokens_seen": tokens_seen * world_size, "elapsed_s": round(el, 2),
             "tok_per_s": round(tokens_seen * world_size / max(el, 1e-9), 1),
             "param_hash": param_hash(model.module if ddp else model),
@@ -375,6 +513,16 @@ def main():
             "ddp": ddp, "world_size": world_size,
             "peak_gpu_mem_mb": round(torch.cuda.max_memory_allocated(device) / 1e6, 1)
                                if device.type == "cuda" else 0.0,
+            "peak_gpu_mem_reserved_mb": round(torch.cuda.max_memory_reserved(device) / 1e6, 1)
+                               if device.type == "cuda" else 0.0,
+            # AMP / benchmark fields (FP32 runs report the neutral values).
+            "precision": precision,
+            "warmup_steps": args.warmup_steps,
+            "steady_tok_per_s": steady_tps,
+            "skipped_steps": skipped_steps,
+            "nonfinite_losses": nonfinite_losses,
+            "nonfinite_grads": nonfinite_grads,
+            "scaler_final_scale": scaler.get_scale() if scaler is not None else None,
         }
         log("SUMMARY " + json.dumps(summary), logf)
         with open(os.path.join(args.ckpt_dir, "last_summary.json"), "w") as f:

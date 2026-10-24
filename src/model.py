@@ -99,8 +99,12 @@ try:
             self.eps = eps
 
         def forward(self, x):
-            var = x.pow(2).mean(dim=-1, keepdim=True)
-            return x * torch.rsqrt(var + self.eps) * self.weight
+            # Numerics: sum-of-squares in fp16 overflows easily (max 65504),
+            # so normalize in fp32 and cast back. For fp32 inputs this is a
+            # no-op (x.float() is x), so the FP32 baseline is bit-identical.
+            xf = x.float()
+            var = xf.pow(2).mean(dim=-1, keepdim=True)
+            return (xf * torch.rsqrt(var + self.eps) * self.weight).to(x.dtype)
 
     def _rope_freqs(head_dim: int, max_len: int, theta: float, device):
         inv = 1.0 / (theta ** (torch.arange(0, head_dim, 2, device=device).float() / head_dim))
