@@ -24,8 +24,9 @@ pilot first.
 > pilot notebook now asserts the corpus identity exactly, so the
 > Kaggle build is a reproducibility check, not an assumption;
 > (3) added §6, the Track B Software Heritage inquiry (draft only —
-> NOT sent). Resulting commit: PENDING (filled by the
-> record-completion commit; see GitHub main history). Sections are
+> NOT sent). Resulting commits: content `fc9fbd48`, notebook pin
+> `d2c44d05` (this line completed by the record-completion commit
+> that follows them on GitHub main). Sections are
 > otherwise unchanged except where this update says so: §2.4 caveat 3
 > resolved, §2.5 gains a §6 pointer, §3's data row uses measured
 > values, old §§6–7 renumbered to §§7–8, §7 blocker 5 resolved,
