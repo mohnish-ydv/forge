@@ -1,6 +1,6 @@
 # EXP-007 — M5 readiness: corpus audit + larger-model pilot
 
-## Status: AUDIT COMPLETE, PILOT PREPARED (NOT RUN), FULL RUN NOT APPROVED
+## Status: AUDIT COMPLETE, PILOT CORPUS BUILT, PILOT PREPARED (NOT RUN), FULL RUN NOT APPROVED
 
 AMP conditionally passed in EXP-006. This experiment answers the two
 questions that blocked M5 after EXP-006: (1) is codeparrot-clean a real,
@@ -12,6 +12,24 @@ code slice, with kill/resume proven at that scale?
 report.** It needs a separate approval after the pilot evidence below is
 reviewed. The recommendation at the end of this version is: run the
 pilot first.
+
+> **Update 2026-10-24 (v2 — parallel corpus tracks).** Starting
+> commits: GitHub `cfee929a` (main), local `0e0fd32`. This update:
+> (1) re-verified all prior evidence before building on it — EXP-005
+> analyzer 26 ok / 0 failures, EXP-006 analyzer 38 ok / 0 failures,
+> full test suite 77/77 green (26 pipeline + 6 decontam + 10 train +
+> 21 heldout + 14 AMP; 1 CUDA-only test skipped on this GPU-less VM)
+> — the M2–M4 gate reports stand as written; (2) built the pilot
+> corpus locally (§2.7): shard 2 behaves like the audit slice, and the
+> pilot notebook now asserts the corpus identity exactly, so the
+> Kaggle build is a reproducibility check, not an assumption;
+> (3) added §6, the Track B Software Heritage inquiry (draft only —
+> NOT sent). Resulting commit: PENDING (filled by the
+> record-completion commit; see GitHub main history). Sections are
+> otherwise unchanged except where this update says so: §2.4 caveat 3
+> resolved, §2.5 gains a §6 pointer, §3's data row uses measured
+> values, old §§6–7 renumbered to §§7–8, §7 blocker 5 resolved,
+> §8 rewritten as the two-track decision.
 
 ## 1. Baseline freeze (verified 2026-10-24)
 
@@ -153,8 +171,9 @@ full-corpus build must run global exact-dedup (cheap: SHA set) and
 report the post-dedup count before the full run; (2) the bytes/4 token
 estimate is a heuristic — the pilot measures `tokens_seen` exactly and
 the full run's data build will count tokenized tokens; (3) shard 1 may
-not be perfectly representative (early shards skew to particular repos
-— the pilot's shard-2 slice is a second sample that tests this).
+not be perfectly representative (early shards skew to particular repos)
+— RESOLVED in v2: the shard-2 pilot slice was built and measured
+(§2.7) and tracks shard 1 within a few percent on every rate.
 
 ### 2.5 Licensing decision: ACCEPTED (conditional, uncertainties flagged)
 
@@ -185,7 +204,8 @@ copyleft license.
   before that distribution.
 
 The-stack-v2 remains a deferred alternative (its gated terms still need
-Mohnish's own HuggingFace acceptance) — it is no longer needed for
+Mohnish's own HuggingFace acceptance; see §6 for the Track B inquiry)
+— it is no longer needed for
 volume, only if the full-corpus measurement contradicts §2.4.
 
 ### 2.6 What the audit does NOT claim
@@ -199,19 +219,53 @@ volume, only if the full-corpus measurement contradicts §2.4.
   the audit slice and the pilot slice are the first corpus measurements
   at scale.
 
+### 2.7 Pilot corpus — built and measured locally (shard 2, v2)
+
+Built with `experiments/build_pilot_corpus.py` — same pipeline code,
+same pinned revision, first 45,000 rows of shard 2: the exact corpus
+the pilot notebook builds on Kaggle. Outputs in `data/pilot_corpus/`
+(git-ignored): `manifest.jsonl`, `corpus.jsonl`, `train.bin`, stats.
+
+| item | pilot corpus (shard 2) | audit Stage B (shard 1) |
+|---|---|---|
+| rows in | 45,000 | 45,000 |
+| retained | **21,676 (48.2%)** | 20,722 (46.0%) |
+| bytes / tokens est (bytes/4) | 197,964,302 B / ~49.5M | 185,605,107 B / ~46.4M |
+| near-dup removed | 876 (3.9% of post-exact survivors; 1,121 candidate pairs) | 1,449 (6.5%) |
+| secrets flagged (all excluded) | 281 | 268 |
+| splits | train 19,483 / val 1,127 / test 1,066 | train 18,668 / val 1,052 / test 1,002 |
+| licenses kept | apache-2.0 8,744; mit 6,444; bsd-3-clause 5,352; bsd-2-clause 684; unlicense 303; cc0-1.0 70; isc 62; artistic-2.0 17 | (Stage A mix, §2.3) |
+| retained with secret hits | **0** | 0 |
+| kept SHAs in more than one split | **0** | 0 |
+| heldout task hits | **[]** | [] |
+| elapsed / peak RSS | 323 s / 4,570 MB | 301 s / 5,658 MB |
+
+`train.bin`: 197,964,302 bytes, sha256
+`bfac94283e5e54ad6b855a0a04545a9d572b79c0eb49eccfad88a274a8ed7a43`
+(independently re-hashed after the build — match). Manifest carries no
+content (verified). Reading: shard 2 tracks shard 1 within a few
+percent on every rate (retention +2.2pp, driven by this slice's lower
+near-dup rate). The pilot notebook's corpus-prep cell now asserts
+`retained == 21,676` and the train.bin sha256 above, so the Kaggle
+build is an exact cross-platform reproducibility check: if it differs,
+the run stops before training and the mismatch itself is the finding
+to report back.
+
 ## 3. Larger-model pilot (prepared, NOT RUN)
 
-Notebook: `notebooks/forge_m7_pilot.ipynb` (pinned to GitHub commit
-`04c5050a`, which contains the AMP training code, the pipeline, and the
-heldout benchmark; all
-code cells compile; corpus-prep cell logic simulated locally on 200 rows:
-112 retained, 0 secret-kept, 0 heldout hits, train.bin built correctly).
+Notebook: `notebooks/forge_m7_pilot.ipynb` (pin updated in v2 — see
+the changelog; the pinned commit contains the AMP training code, the
+pipeline, and the heldout benchmark; all
+code cells compile; corpus-prep validated two ways: cell logic
+simulated locally on 200 rows — 112 retained, 0 secret-kept,
+0 heldout hits — and the full corpus built locally, §2.7, with the
+notebook asserting that exact identity before training).
 
 | item | design |
 |---|---|
 | Model | 125M-class: d=768, L=18, 12 heads / 3 KV heads, byte vocab 256 → 111,701,760 params (same config the EXP-006 projection uses) |
 | Precision / device | FP16 AMP, single T4 (session may be T4 x2; the benchmark uses one GPU) |
-| Data | Shard 2 (not the audit's shard 1), first 45,000 rows → same pipeline → `data/pilot/train.bin`. Expected at audit rates: ~21,000 files, ~200 MB, ~50M tokens — ~1 epoch at 6,100 steps × 8,192 tokens |
+| Data | Shard 2 (not the audit's shard 1), first 45,000 rows → same pipeline → `data/pilot/train.bin`. Measured locally (§2.7): 21,676 files, 198.0 MB, ~49.5M tokens — ~1 epoch at 6,100 steps × 8,192 tokens; the notebook asserts the exact corpus identity (count + sha256) before training |
 | Phase A probe | 300 steps, T_max=6100 (full schedule), warmup 20, ckpt-every 300 — measures 125M steady tok/s + peak memory directly |
 | Kill/resume test | Separate dir, fresh 200-step run, ckpt-every 50, killed mid-run (~75 s), fresh-process `--resume` to 200, scaler restore asserted — the mechanism a multi-session full run depends on, tested at full model size |
 | Phase B main run | `--resume` to 6,100 steps, ckpt-every 1000, val-every 1000, log-every 100, full log kept for the loss curve |
@@ -267,11 +321,102 @@ band is **~63–94 h base, ~94–141 h planning** — all multi-week on
 
 Pilot cost itself: under 2 GPU-hours, one session, no quota risk.
 
-## 6. Outstanding blockers
+## 6. Track B — Software Heritage inquiry for the-stack-v2 (DRAFT — NOT SENT)
 
-1. **Pilot not run** (Kaggle) — the main blocker. Everything downstream
-   (measured 125M throughput, real-data stability, pipeline validation)
-   waits on it.
+Independent of Track A by design: this track never blocks the pilot.
+
+**Verified facts (primary source: the dataset's HuggingFace page,
+read 2026-10-24):** all four the-stack-v2 variants (full, dedup,
+train-full-ids, train-smol-ids) contain **SWHIDs only, not file
+contents** — the page states: "These datasets only contain the SWHIDs
+to download the code files and not the content of the files itself."
+Contents live in Software Heritage's S3 bucket; bulk download
+requires AWS credentials **and** a separate bulk-download agreement
+with Software Heritage/INRIA (contact: datasets@softwareheritage.org).
+The HF side is also gated: access requires accepting the terms of use
+**and** sharing contact information (email + username) with the
+maintainers. The terms require honoring original licenses (incl.
+attribution), adhering to Software Heritage's principles for LM
+training, and staying on the latest dataset version so opt-out
+removals propagate (v2.2.0 removed repos that opted out before
+2026-07-29). Scale, for context: full 67.5 TB; train-smol-ids is the
+StarCoder2 training set (600B+ unique tokens, includes Python).
+
+**Status: the email below is a DRAFT. It has NOT been sent, and this
+report does not claim otherwise.** Mohnish sends it from his own
+address if he chooses. Nothing about approval, response time, or data
+availability is assumed, and no bulk retrieval has been attempted.
+
+> Subject: Bulk access inquiry — The Stack v2 Python slice for a small
+> open-source research model
+>
+> Hello Software Heritage datasets team,
+>
+> I'm an independent researcher (zero-budget, open-source) building
+> FORGE, a small code language model trained from scratch. I'm
+> interested in the Python portion of bigcode/the-stack-v2-train-smol-ids.
+> I understand the HuggingFace dataset contains SWHIDs only, and that
+> downloading the underlying file contents in bulk from the Software
+> Heritage archive requires a separate agreement with Software
+> Heritage/INRIA.
+>
+> Before I plan around this dataset, could you clarify:
+>
+> 1. **Eligibility** — does an independent researcher without an
+>    institutional affiliation qualify for a bulk-download agreement?
+>    Is there a lighter-weight path for a small, Python-only slice
+>    rather than the full archive?
+> 2. **Process and timeline** — what are the steps (application,
+>    agreement text, approval), and what turnaround should I
+>    realistically expect?
+> 3. **Fees** — is there any charge for the agreement or for archive
+>    access? If content is served from S3, who bears egress/request
+>    costs?
+> 4. **Access mechanism** — how is bulk access provided (S3
+>    credentials, signed URLs, API)? Are there rate limits or a
+>    required retrieval tool?
+> 5. **Scope** — can access be limited to a defined subset (e.g.,
+>    Python files referenced by the smol-ids list)?
+> 6. **Usage restrictions** — are any uses prohibited? Is training a
+>    model whose weights are then distributed openly (permissive
+>    open-source license) within the permitted use?
+> 7. **Licensing and attribution** — the dataset terms require
+>    honoring original licenses including attribution. What does
+>    attribution concretely require for a trained model and its
+>    documentation? How should files with missing or ambiguous
+>    license metadata be treated?
+> 8. **Opt-out removals** — how are removals propagated (new dataset
+>    versions, removal lists)? If a repository opts out after a model
+>    is trained, what obligations follow for already-trained weights?
+> 9. **Version currency** — the terms require staying on the latest
+>    version. How often are versions cut, and how would I be notified?
+> 10. **Data handling** — may I keep a local copy of the retrieved
+>     slice for the project's duration? Any retention/deletion
+>     requirements if the agreement ends?
+> 11. **Credit** — how should Software Heritage and BigCode be cited
+>     in the model card and repository?
+>
+> Happy to share project details (repository, data pipeline,
+> license-filtering approach). Thank you for your time.
+>
+> [Full name]
+> [Contact email]
+> [HuggingFace username]
+
+**Unanswered questions (nothing assumed until Software Heritage
+replies):** eligibility of an unaffiliated individual; whether a
+Python-only slice is grantable; any fees or S3 costs; the agreement's
+exact terms on open weight distribution and post-training opt-outs;
+response latency. Until answered, Track B is a contingency for corpus
+quality/diversity — not a dependency: §2 shows codeparrot-clean
+already supplies the volume.
+
+## 7. Outstanding blockers
+
+1. **Pilot not run** (Kaggle) — the main blocker. The corpus side is
+   now measured and identity-gated (§2.7), so what remains is purely
+   the GPU phases: measured 125M throughput, real-data stability,
+   kill/resume at scale, dev-split eval.
 2. Full-corpus unique-token count after global exact-dedup — estimated
    only (§2.4) until the full-corpus build runs.
 3. **Near-dup at full-corpus scale needs a redesign** (sharded or
@@ -281,27 +426,39 @@ Pilot cost itself: under 2 GPU-hours, one session, no quota risk.
 4. Budget decision: accept the pilot-revised 125M budget (or scope down:
    fewer tokens, smaller first model) — a human decision, not a technical
    one.
-5. Corpus condition: the §2.5 acceptance is conditional on the pilot's
-   shard-2 slice behaving like the audit slice (retention, licenses,
-   secrets, heldout isolation all re-checked in the notebook).
-6. the-stack-v2: deferred alternative, not required for volume.
+5. Corpus condition from v1 — **RESOLVED in v2**: the §2.5 acceptance
+   was conditional on the pilot's shard-2 slice behaving like the audit
+   slice; it was built locally and does (§2.7), and the notebook
+   re-verifies the identity exactly on Kaggle before training.
+6. Track B inquiry: draft ready (§6), **NOT sent** — Mohnish's action
+   if he wants the parallel track. By design it does not block
+   Track A, the pilot, or any full-run decision.
 
-## 7. Recommendation: RUN THE PILOT FIRST
+## 8. Recommendation: RUN THE PILOT (TRACK A) + SEND THE INQUIRY (TRACK B) — IN PARALLEL
 
-- **Proceed to the full run? No** — not before measured 125M throughput
-  and real-data stability exist. A 75–113 h commitment on an extrapolated
-  number would repeat the EXP-003→EXP-005 error (assumed 65 TFLOPS FP16
-  vs measured FP32 reality).
+The decision, in the terms of the v2 brief:
+
+- **Proceed with another pilot? This is the pilot — proceed with it.**
+  Run `forge_m7_pilot.ipynb` on Kaggle (GPU session, one GPU), Run
+  All, <2 GPU-hours. Download `pilot_results.json` +
+  `corpus_stats.json` + the two baseline JSONs and return them. The
+  pilot-results update of this report then issues the final
+  recommendation (proceed / another pilot / stop and redesign) with
+  the measured 125M throughput and the realistic compute commitment
+  stated plainly for approval.
+- **Wait for data approval? No.** Track B (Software Heritage) runs in
+  parallel as a contingency for corpus quality — it is never a gate
+  on Track A. Codeparrot-clean is audited, conditionally licensed
+  (§2.5), measured at pilot scale (§2.7), and sufficient for volume.
+  If Mohnish wants the Track B option open, he sends the §6 draft
+  from his own address; the pilot does not wait for the reply.
 - **Stop and redesign? No** — nothing has failed. AMP is proven, the
-  corpus measures viable on two samples, the pipeline is validated, and
-  the pilot is cheap (<2 h) and de-risks exactly the two unknowns that
-  matter.
-- **Run another pilot? This IS the pilot.** Run `forge_m7_pilot.ipynb`
-  on Kaggle (GPU), download `pilot_results.json` + `corpus_stats.json`,
-  and return them. EXP-007 v2 then fills in the pilot results and issues
-  the final recommendation: proceed / another pilot / stop and redesign,
-  with the updated compute commitment stated plainly for approval.
+  corpus measures viable on two independent slices, the pipeline is
+  validated, every gate checkable without a GPU has now been checked
+  twice, and the pilot is cheap (<2 h) and de-risks exactly the two
+  unknowns that matter (125M throughput, real-data stability).
+- **Request human approval for the larger run? Not yet.** The full
+  125M / 2.5B-token run still requires Mohnish's explicit approval
+  AFTER the pilot evidence is in — the hard stop stands.
 
-No full pretraining starts automatically. The next approval requested is
-for the pilot run itself (already designed) and, after its evidence, for
-the full run's budget.
+No full pretraining starts automatically.
