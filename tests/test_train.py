@@ -106,6 +106,27 @@ class TestTrainLoop(unittest.TestCase):
         evaluate(m, batches, torch.device("cpu"))
         self.assertEqual(before, param_hash(m))
 
+    def test_6b_param_hash_matches_hand_computed_sum(self):
+        # Regression: param_hash must equal the plain float64 sum of all params,
+        # computed with the accumulator on CPU (see Kaggle GPU smoke run, where a
+        # CUDA param sum added to a CPU accumulator raised at SUMMARY time).
+        m, _ = tiny_model()
+        expected = 0.0
+        for p in m.parameters():
+            expected += float(p.detach().double().sum().cpu().item())
+        self.assertEqual(param_hash(m), expected)
+
+    @unittest.skipUnless(torch.cuda.is_available(), "needs CUDA")
+    def test_6c_param_hash_on_cuda_model(self):
+        # The exact Kaggle failure: model on cuda:0, accumulator must not mix
+        # devices. Fails on the old code, passes with the .cpu() fix.
+        m, _ = tiny_model()
+        m = m.to("cuda")
+        expected = 0.0
+        for p in m.parameters():
+            expected += float(p.detach().double().sum().cpu().item())
+        self.assertEqual(param_hash(m), expected)
+
     def test_7_loss_decreases_on_memorizable(self):
         # Tiny repetitive data the model can memorize: loss must fall.
         torch.manual_seed(3)

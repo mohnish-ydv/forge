@@ -210,9 +210,12 @@ def evaluate(model, batches, device):
 
 
 def param_hash(model):
+    # h lives on CPU; CUDA params must be moved over before adding, otherwise
+    # a CUDA tensor + CPU accumulator raises (caught by the Kaggle GPU smoke run).
+    # .cpu() is a no-op for CPU tensors, so CPU results are bit-identical.
     h = torch.zeros((), dtype=torch.float64)
     for p in model.parameters():
-        h += p.detach().double().sum()
+        h += p.detach().double().sum().cpu()
     return float(h.item())
 
 
