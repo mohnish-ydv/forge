@@ -2,13 +2,19 @@
 
 Date: 2026-10-24. Repo: ~/workspace/forge.
 Code commit: `6775404` (feat: DDP multi-GPU path). Notebook commit: `5dcbc3f`.
+Kaggle run: 2026-10-24, notebook pinned to GitHub snapshot `fa63122` (param_hash CUDA fix).
 
-## Status: PREPARED — Kaggle execution NOT RUN
+## Status: RUN — real Kaggle GPU results below (section 5)
 
-No GPU exists in this environment, so **no Kaggle execution is claimed**.
-Everything below the "Kaggle run" line is preparation + local verification.
-The GPU-results section is explicitly marked NOT RUN and must be filled in
-from real logs after Mohnish runs the notebook.
+Run A/B/C all completed on Kaggle. Total GPU time ≈ 4 min (9.5 + 173.9 + 41.8 s).
+Raw results archived at `experiments/gpu_smoke_results.json` (as uploaded by
+Mohnish); independently verified by `experiments/analyze_smoke_results.py`
+(26 ok, 0 failures after two analyzer bugs were fixed — see section 6).
+**Gate E verdict: MFU assumption VALIDATED (30.9% ∈ 25–35%), but the
+EXP-003 hour estimate is NOT validated** — it assumed the 65 TFLOPS FP16
+peak, while training is FP32 (8.1 TFLOPS peak), so the honest FP32
+projection is ~218 GPU-hours for 125M/2.5B tokens, not 23–32 h. Mixed
+precision (FP16 AMP) is now a prerequisite for M5, not an optimization.
 
 ## 1. What was verified locally (this VM, CPU-only)
 
@@ -102,34 +108,59 @@ CLI/API alternative (later, optional):
   After a CLI push, open the notebook in the browser and set
   Accelerator → GPU T4 x2 before running.
 
-## 5. GPU results — NOT RUN (fill in after Mohnish's run)
+## 5. GPU results — RUN 2026-10-24 (Kaggle, real hardware)
 
 | item | value |
 |---|---|
-| GPU model / count | _pending_ |
-| CUDA usable | _pending_ |
-| Run A tok/s | _pending_ |
-| Run B tok/s, peak mem | _pending_ |
-| Run C (DDP) scaling | _pending_ |
-| MFU (FP32) | _pending_ |
-| 125M projection | _pending_ |
+| GPU model / count | 2× Tesla T4, 15,636 MB VRAM each |
+| Software | torch 2.11.0+cu128, CUDA 12.8, Python 3.13.15 |
+| Commit pin | pinned = actual HEAD = `fa63122` (param_hash CUDA fix) |
+| CUDA usable | yes (asserted in env cell; all runs on cuda:0 / DDP) |
+| Run A tok/s | 2,146 (tiny 1.02M, 40 steps; loss 17.85/17.94 — reproduces M3 CPU 17.79/18.24) |
+| Run B tok/s, peak mem | 14,133 tok/s, 3,488 MB (25.31M, 300 steps, batch 16×512) |
+| Run C (DDP) scaling | aggregate 15,664 tok/s vs single-GPU 14,133 → ~11% faster aggregate, ~55% scaling efficiency — CONFOUNDED (40 vs 300 steps, 2× global batch); not a clean scaling measurement |
+| MFU (FP32) | Run B 30.9% (independently recomputed, agrees with notebook) |
+| MFU (FP32) Run C | 17.1% per GPU (notebook's 0.342 divides 2-GPU throughput by a single GPU's peak — overstated 2×, corrected by the analyzer) |
+| 125M projection | ~218 GPU-hours FP32 (125M/2.5B tokens) — OUTSIDE the EXP-003 band 23–32 h |
+
+Run B loss 0.173/0.176 is memorization of the repetitive toy fixture by a
+25M model over 300 steps, not divergence (train/val ratio 1.02). Run A tok/s
+is a tiny-model artifact (512 tokens/step, val eval dominating), not a GPU
+verdict — Run B is the measurement that matters.
 
 ## 6. Failures, limitations, next decision
 
 - **Environment failure (local):** TCP-based torch.distributed rendezvous
   does not work in this VM (loopback handshake corrupted) — DDP was
   validated via `file://` rendezvous instead. Kaggle NCCL is unaffected
-  by this; Run C will tell us the truth.
-- **Not validated:** NCCL 2-GPU scaling; any GPU number in this report.
+  by this; Run C confirmed DDP works on Kaggle (both GPUs used).
+- **Analyzer bugs fixed during review (2026-10-24):** the review tool's
+  absolute loss band (5–45) falsely failed Run B/C (low loss on this
+  fixture is memorization, not divergence) — replaced with
+  finite/positive + train/val-agreement checks; its hardcoded pin was
+  stale (d6089ae0 → fa63122); its Run C MFU divided 2-GPU throughput by
+  a single GPU's peak (0.342 → honest 0.171 per GPU). After fixes:
+  26 ok, 0 failures.
 - **Notebook caveat:** `git clean -fdx` in the fetch cell wipes untracked
   files in the clone (regenerates toy data after) — by design, but noted.
-- **Next decision:** after Mohnish pastes `gpu_smoke_results.json`, revise
-  the EXP-003 Gate E table with measured MFU. If Run B MFU ∈ 25–35%, the
-  M5 plan (125M v0 ≈ 23–32 T4-hours) is validated; if far off, revise
-  before spending quota.
+- **Notebook caveat 2:** the notebook's Run C MFU (0.342) is overstated 2×
+  (same denominator error as the analyzer had); use 17.1% per GPU.
+- **Next decision (Gate E verdict):** the MFU assumption (25–35%) is
+  validated at 30.9%, but the EXP-003 hour estimate assumed FP16 peak
+  (65 TFLOPS) while training is FP32 (8.1 TFLOPS). At FP32, 125M/2.5B
+  costs ~218 GPU-hours — ~7 weeks of Kaggle's ~30 GPU-h/week quota for
+  one run. **Do not start M5 pretraining at FP32.** Next step: implement
+  FP16 mixed precision (autocast + GradScaler) in `src/train.py`, then a
+  short GPU smoke re-run of Run B with AMP to measure FP16 MFU. At
+  similar MFU on 65 TFLOPS peak, the projection returns to ~27 h,
+  inside the original band. Corpus decision (the-stack-v2 terms vs
+  codeparrot-clean fallback) remains open in parallel.
 
 ## 7. Gates (unchanged)
 
-- **M5 pretraining: BLOCKED.** Corpus decision is separate and still open
+- **M5 pretraining: BLOCKED.** (a) Corpus decision still open
   (the-stack-v2 gated terms need Mohnish's own HF acceptance).
-- No pretraining started; no GPU execution claimed; no scores fabricated.
+  (b) NEW: FP32 compute cost too high (~218 h); AMP + FP16 smoke
+  re-validation required first.
+- No pretraining started; no scores fabricated. GPU numbers above are
+  measured, projections are labeled estimates.

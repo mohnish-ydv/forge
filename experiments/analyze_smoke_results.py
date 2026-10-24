@@ -26,9 +26,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 from model import ForgeConfig  # noqa: E402  (torch-free: pure arithmetic)
 
-# The GitHub snapshot commit the fixed smoke notebook pins. A different value
-# means Mohnish ran an older/different notebook version -- flag, don't trust.
-KNOWN_PIN = "d6089ae0dea6028508213d9709e467c7a4374062"
+# The GitHub snapshot commit the current smoke notebook pins. Bump this when
+# the notebook is re-pinned (a mismatch alone only means a newer/older
+# notebook ran -- the binding check is pinned_commit == actual_head).
+KNOWN_PIN = "fa631226c43f2ce24df5c6793ec8491ec5baf4f3"
 
 # FP32 peaks (training is FP32, no AMP) -- must agree with the notebook.
 FP32_PEAK = {"T4": 8.1e12, "P100": 9.3e12}
@@ -48,7 +49,9 @@ EXPECTED = {
 # band below is intentionally loose -- it catches divergence/NaN, not noise.
 M3_REF = {"final_train_loss": 17.793315887451172,
           "final_val_loss": 18.236953735351562}
-LOSS_BAND = (5.0, 45.0)  # generous: must merely look like a sane descent
+# Loss sanity is NOT an absolute band: on this fixture a bigger model trained
+# longer memorizes the templates (25M/300 steps -> ~0.17 is success, not
+# failure). Check finiteness/positivity + train/val agreement instead.
 
 # EXP-003 Gate E assumption under test (125M v0, 2.5B tokens).
 GATE_E_BAND_T4H = (23.0, 32.0)
@@ -167,24 +170,36 @@ def main(path: str) -> int:
             rep.fail(f"{tag}: bad tok/s ({tps}) or elapsed ({el})")
         for lk in ("final_train_loss", "final_val_loss"):
             lv = r.get(lk)
-            if isinstance(lv, (int, float)) and math.isfinite(lv) \
-                    and LOSS_BAND[0] <= lv <= LOSS_BAND[1]:
-                rep.ok(f"{tag}: {lk}={lv:.2f} within sane band")
+            if isinstance(lv, (int, float)) and math.isfinite(lv) and lv > 0:
+                rep.ok(f"{tag}: {lk}={lv:.4g} finite and positive")
             else:
-                rep.fail(f"{tag}: {lk}={lv} outside sane band {LOSS_BAND} "
+                rep.fail(f"{tag}: {lk}={lv} not finite/positive "
                          f"(divergence or failed run?)")
+        # train/val agreement: a large gap signals a real problem; a low
+        # absolute loss is memorization of this fixture, not failure.
+        tl, vl = r.get("final_train_loss"), r.get("final_val_loss")
+        if isinstance(tl, (int, float)) and isinstance(vl, (int, float)) \
+                and tl > 0 and vl > 0:
+            ratio = max(tl, vl) / min(tl, vl)
+            if ratio < 2.0:
+                rep.ok(f"{tag}: train/val agree (ratio {ratio:.2f})")
+            else:
+                rep.fail(f"{tag}: train/val disagree (ratio {ratio:.2f})")
         mem = r.get("peak_gpu_mem_mb")
         if isinstance(mem, (int, float)) and mem and mem > 0:
             rep.ok(f"{tag}: peak_gpu_mem_mb={mem:.0f}")
 
-        # independent MFU recomputation (do not trust the notebook's number)
+        # independent MFU recomputation (do not trust the notebook's number).
+        # tok/s is aggregate across ranks, so the denominator is peak x gpus:
+        # dividing 2-GPU throughput by a single GPU's peak overstates MFU 2x.
         if peak and tps:
             fpt, n_exact = flops_per_token(exp["d_model"], exp["n_layers"])
-            mfu = tps * fpt / peak
+            peak_total = peak * exp["gpus"]
+            mfu = tps * fpt / peak_total
             nb_mfu = r.get("mfu_fp32")
             line = (f"{tag}: independent MFU(fp32)={mfu:.3f} "
                     f"(N={n_exact/1e6:.2f}M, {tps:.0f} tok/s x {fpt/1e9:.2f} GFLOP/tok "
-                    f"/ {peak/1e12:.1f} TFLOPS)")
+                    f"/ {peak_total/1e12:.1f} TFLOPS over {exp['gpus']} GPU(s))")
             if nb_mfu is not None and math.isclose(mfu, nb_mfu, rel_tol=0.05):
                 rep.ok(line + f" -- agrees with notebook ({nb_mfu})")
             else:

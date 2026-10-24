@@ -1,0 +1,84 @@
+{
+  "notebook": "forge_m5_gpu_smoke",
+  "pinned_commit": "fa631226c43f2ce24df5c6793ec8491ec5baf4f3",
+  "actual_head": "fa631226c43f2ce24df5c6793ec8491ec5baf4f3",
+  "hardware": {
+    "gpu_names": [
+      "Tesla T4",
+      "Tesla T4"
+    ],
+    "gpu_count": 2,
+    "vram_total_mb": [
+      15636.0,
+      15636.0
+    ],
+    "torch": "2.11.0+cu128",
+    "cuda_torch": "12.8",
+    "python": "3.13.15",
+    "fp32_peak_flops_used": 8100000000000.0
+  },
+  "methodology": "measured: tok/s, elapsed, peak mem, losses. estimated: FLOPs/token = 6N + 12*L*d*S (\u00b110% band). MFU vs FP32 peak (training is FP32, no AMP).",
+  "runs": {
+    "A-tiny-1M": {
+      "status": "ok",
+      "config": {
+        "tag": "A-tiny-1M",
+        "d_model": 128,
+        "n_layers": 4,
+        "steps": 40,
+        "batch": 8,
+        "seq": 64,
+        "gpus": 1
+      },
+      "params_exact": 1016960,
+      "elapsed_s": 9.54,
+      "tok_per_s": 2145.7,
+      "peak_gpu_mem_mb": 63.0,
+      "final_train_loss": 17.84606170654297,
+      "final_val_loss": 17.9402517762574,
+      "flops_per_token_est": 9247488,
+      "mfu_fp32": 0.002
+    },
+    "B-25M": {
+      "status": "ok",
+      "config": {
+        "tag": "B-25M",
+        "d_model": 512,
+        "n_layers": 8,
+        "steps": 300,
+        "batch": 16,
+        "seq": 512,
+        "gpus": 1
+      },
+      "params_exact": 25305600,
+      "elapsed_s": 173.89,
+      "tok_per_s": 14133.3,
+      "peak_gpu_mem_mb": 3487.5,
+      "final_train_loss": 0.17258894443511963,
+      "final_val_loss": 0.1755549689133962,
+      "flops_per_token_est": 176999424,
+      "mfu_fp32": 0.309,
+      "proj_125m_2p5B_gpu_hours": 218.4
+    },
+    "C-25M-ddp2": {
+      "status": "ok",
+      "config": {
+        "tag": "C-25M-ddp2",
+        "d_model": 512,
+        "n_layers": 8,
+        "steps": 40,
+        "batch": 16,
+        "seq": 512,
+        "gpus": 2
+      },
+      "params_exact": 25305600,
+      "elapsed_s": 41.84,
+      "tok_per_s": 15664.5,
+      "peak_gpu_mem_mb": 3588.7,
+      "final_train_loss": 3.7676565647125244,
+      "final_val_loss": 3.7125782012939452,
+      "flops_per_token_est": 176999424,
+      "mfu_fp32": 0.342
+    }
+  }
+}
