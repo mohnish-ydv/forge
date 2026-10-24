@@ -1,0 +1,160 @@
+{
+  "benchmark": "forge-heldout-v1",
+  "benchmark_sha256": "a156b8bd081e73153aa73b56b87ed9d628c4fc4e6dccd5042db9c984e1843c6a",
+  "baseline": "empty",
+  "split": "all",
+  "timeout": 10,
+  "elapsed_s": 2.33,
+  "pass_at_1": 0.0,
+  "passed": 0,
+  "total": 24,
+  "error_funnel": {
+    "assertion": 24
+  },
+  "per_task": [
+    {
+      "id": "dev_sum_of_squares",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_is_palindrome",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_word_count",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_fibonacci_list",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_merge_sorted",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_char_frequency",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_is_prime",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_flatten_once",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_title_case",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_gcd",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_unique_sorted",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "dev_caesar_shift",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_run_length_encode",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_balanced_brackets",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_second_largest",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_group_anagrams",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_pascal_row",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_longest_common_prefix",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_sieve",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_chunk_list",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_most_frequent",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_interleave",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_digit_sum",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    },
+    {
+      "id": "heldout_rotate_right",
+      "passed": false,
+      "error_class": "assertion",
+      "detail": "AssertionError"
+    }
+  ]
+}

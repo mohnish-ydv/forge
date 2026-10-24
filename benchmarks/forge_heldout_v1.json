@@ -1,0 +1,355 @@
+{
+  "version": "forge-heldout-v1",
+  "created": "2026-10-24",
+  "author": "FORGE project (Khushi) \u2014 original tasks",
+  "license": "CC0-1.0",
+  "frozen": true,
+  "provenance": "All 24 tasks and their tests were authored from scratch for FORGE on 2026-10-24. No task was copied from any public benchmark or dataset. Reference solutions live only in build_heldout.py (quarantined, never training data). Any edit to prompts or tests requires a version bump.",
+  "splits": {
+    "dev": "iteration allowed",
+    "heldout": "final evaluation only; never tune on these"
+  },
+  "tasks": [
+    {
+      "id": "dev_sum_of_squares",
+      "split": "dev",
+      "prompt": "def sum_of_squares(n):\n    \"\"\"Return 1^2 + 2^2 + ... + n^2. For n <= 0 return 0.\"\"\"",
+      "tests": [
+        "assert sum_of_squares(3) == 14",
+        "assert sum_of_squares(1) == 1",
+        "assert sum_of_squares(0) == 0",
+        "assert sum_of_squares(10) == 385",
+        "assert sum_of_squares(-5) == 0"
+      ],
+      "entry_point": "sum_of_squares",
+      "prompt_sha256": "e7524bfb9d874a6947741a865d2d53e4b2f1c257dc85bc2efc48840d7279ed88",
+      "tests_sha256": "15a991fa19d3c1904db7113bcdb89164fc0d675a1f14b4def5bcdaa5e54ebf25"
+    },
+    {
+      "id": "dev_is_palindrome",
+      "split": "dev",
+      "prompt": "def is_palindrome(s):\n    \"\"\"Return True if s reads the same forwards and backwards,\n    ignoring case and non-alphanumeric characters.\"\"\"",
+      "tests": [
+        "assert is_palindrome('racecar') is True",
+        "assert is_palindrome('hello') is False",
+        "assert is_palindrome('A man, a plan, a canal: Panama') is True",
+        "assert is_palindrome('') is True",
+        "assert is_palindrome('a') is True"
+      ],
+      "entry_point": "is_palindrome",
+      "prompt_sha256": "ad56d56930b61a060c06f744d5828b61c50db881b84c320f3d59abee360f8fae",
+      "tests_sha256": "a253cab4d216b2526aab999e49a48960c1a57b3dfbd23d08c540b7896e9c1ee0"
+    },
+    {
+      "id": "dev_word_count",
+      "split": "dev",
+      "prompt": "def word_count(s):\n    \"\"\"Return the number of whitespace-separated words in s.\"\"\"",
+      "tests": [
+        "assert word_count('hello world') == 2",
+        "assert word_count('') == 0",
+        "assert word_count('  a  b  ') == 2",
+        "assert word_count('one') == 1"
+      ],
+      "entry_point": "word_count",
+      "prompt_sha256": "094cb38150eeaac88a4bfc38ae1da4553c2b64c9f4c33088ac25a028b46e5399",
+      "tests_sha256": "df57a8da73cf4d8c5a06cca9bcf8b4656fc9b8cd5fa76b3a9dad096efb3aaae9"
+    },
+    {
+      "id": "dev_fibonacci_list",
+      "split": "dev",
+      "prompt": "def fibonacci_list(n):\n    \"\"\"Return a list of the first n Fibonacci numbers, starting 0, 1.\"\"\"",
+      "tests": [
+        "assert fibonacci_list(0) == []",
+        "assert fibonacci_list(1) == [0]",
+        "assert fibonacci_list(2) == [0, 1]",
+        "assert fibonacci_list(7) == [0, 1, 1, 2, 3, 5, 8]"
+      ],
+      "entry_point": "fibonacci_list",
+      "prompt_sha256": "e7700049d3ec33d22e1807c334bab030ec1f638f8f68fd45050033954cb27feb",
+      "tests_sha256": "59577d92931501b5afa22aa7c787259084350a51d8f875c49c8f8c2c9380ab85"
+    },
+    {
+      "id": "dev_merge_sorted",
+      "split": "dev",
+      "prompt": "def merge_sorted(a, b):\n    \"\"\"Merge two ascending-sorted lists into one ascending-sorted list.\"\"\"",
+      "tests": [
+        "assert merge_sorted([1, 3, 5], [2, 4]) == [1, 2, 3, 4, 5]",
+        "assert merge_sorted([], [1]) == [1]",
+        "assert merge_sorted([2], [1]) == [1, 2]",
+        "assert merge_sorted([1, 1], [1]) == [1, 1, 1]",
+        "assert merge_sorted([], []) == []"
+      ],
+      "entry_point": "merge_sorted",
+      "prompt_sha256": "ae11aefc1caec14a6b47edb85a3256fd94a8f51c23db62561bc9ccad148d8bfd",
+      "tests_sha256": "fe0d237fa0c43c39d57d7d6e45ac309ee2de05136e345d253113143398ccac99"
+    },
+    {
+      "id": "dev_char_frequency",
+      "split": "dev",
+      "prompt": "def char_frequency(s):\n    \"\"\"Return a dict mapping each character in s to its count.\"\"\"",
+      "tests": [
+        "assert char_frequency('aab') == {'a': 2, 'b': 1}",
+        "assert char_frequency('') == {}",
+        "assert char_frequency('Aa') == {'A': 1, 'a': 1}"
+      ],
+      "entry_point": "char_frequency",
+      "prompt_sha256": "f91f834b52caa410c6b13255045c0050ae87ade2c8f6180e584e9e84bcb5dec6",
+      "tests_sha256": "b235157d949b4aead5806e8f1a2432fae7050d258fed2c30857f7bdfc625d2d9"
+    },
+    {
+      "id": "dev_is_prime",
+      "split": "dev",
+      "prompt": "def is_prime(n):\n    \"\"\"Return True if n is a prime number, else False.\"\"\"",
+      "tests": [
+        "assert is_prime(2) is True",
+        "assert is_prime(1) is False",
+        "assert is_prime(0) is False",
+        "assert is_prime(17) is True",
+        "assert is_prime(15) is False",
+        "assert is_prime(97) is True"
+      ],
+      "entry_point": "is_prime",
+      "prompt_sha256": "be2f9cf3b7564f3b5fef8fd894181734dece5310732d0f8ab579caf530487b88",
+      "tests_sha256": "145d25fa47a7d09e1393ecba70c54e0374f82c8cb8615571ced02fd62265eab4"
+    },
+    {
+      "id": "dev_flatten_once",
+      "split": "dev",
+      "prompt": "def flatten_once(nested):\n    \"\"\"Flatten one level of nesting: [[1,2],[3]] -> [1,2,3].\n    Non-list elements are kept as-is.\"\"\"",
+      "tests": [
+        "assert flatten_once([[1, 2], [3]]) == [1, 2, 3]",
+        "assert flatten_once([]) == []",
+        "assert flatten_once([[], [1]]) == [1]",
+        "assert flatten_once([1, [2]]) == [1, 2]"
+      ],
+      "entry_point": "flatten_once",
+      "prompt_sha256": "f0be28db217393ab775f10d6d7fd0ffdf262538144cf385e68d949a7b2711964",
+      "tests_sha256": "8de941346c626160c2f6f944f31a5afc7e882369fd0e02a5138c7969c6cc0eed"
+    },
+    {
+      "id": "dev_title_case",
+      "split": "dev",
+      "prompt": "def title_case(s):\n    \"\"\"Capitalize the first letter of each word, lowercasing the rest.\"\"\"",
+      "tests": [
+        "assert title_case('hello world') == 'Hello World'",
+        "assert title_case('') == ''",
+        "assert title_case('a b c') == 'A B C'",
+        "assert title_case('HELLO') == 'Hello'"
+      ],
+      "entry_point": "title_case",
+      "prompt_sha256": "76177a372caf1f83b24d638bc64f16cd497a8139709022a0500b4fb0e2be1eb9",
+      "tests_sha256": "a1e8cf689d80aacab4ccc5529b396502c04d78cc1e022a17d59c7df11c8ad463"
+    },
+    {
+      "id": "dev_gcd",
+      "split": "dev",
+      "prompt": "def gcd(a, b):\n    \"\"\"Return the greatest common divisor of a and b (non-negative ints).\"\"\"",
+      "tests": [
+        "assert gcd(12, 8) == 4",
+        "assert gcd(0, 5) == 5",
+        "assert gcd(7, 7) == 7",
+        "assert gcd(100, 35) == 5"
+      ],
+      "entry_point": "gcd",
+      "prompt_sha256": "45e7aeaba765c221a399ea4306ea0b8eaf028024c53bd39f347957455c4a9073",
+      "tests_sha256": "62cdcd4e54dd20c4e1849c2882823e701232f3b7b50050f8380dc7bfb4cc07ae"
+    },
+    {
+      "id": "dev_unique_sorted",
+      "split": "dev",
+      "prompt": "def unique_sorted(lst):\n    \"\"\"Return the distinct elements of lst in ascending order.\"\"\"",
+      "tests": [
+        "assert unique_sorted([3, 1, 2, 1]) == [1, 2, 3]",
+        "assert unique_sorted([]) == []",
+        "assert unique_sorted([5, 5, 5]) == [5]"
+      ],
+      "entry_point": "unique_sorted",
+      "prompt_sha256": "e7fba54f51245b3cbc2664635144c8770b94f2789f7b03c104b5e1435bf81233",
+      "tests_sha256": "b2320cb4d8b97f8a1f01c60f296a503fb695b19a1482d55022e84375134e784e"
+    },
+    {
+      "id": "dev_caesar_shift",
+      "split": "dev",
+      "prompt": "def caesar_shift(s, k):\n    \"\"\"Shift each lowercase letter in s forward by k positions (wrap around).\n    Leave other characters unchanged.\"\"\"",
+      "tests": [
+        "assert caesar_shift('abc', 1) == 'bcd'",
+        "assert caesar_shift('xyz', 3) == 'abc'",
+        "assert caesar_shift('hello', 0) == 'hello'",
+        "assert caesar_shift('a', 26) == 'a'",
+        "assert caesar_shift('a b!', 1) == 'b c!'"
+      ],
+      "entry_point": "caesar_shift",
+      "prompt_sha256": "9ac016e0ae36ddb52303393191dbc8e0761aada206a5ba0fa82c557846ff5abb",
+      "tests_sha256": "b031e1aff613dd643cc2b8e9d899494f413b23ab5014fe563bd16469d3bd1475"
+    },
+    {
+      "id": "heldout_run_length_encode",
+      "split": "heldout",
+      "prompt": "def run_length_encode(s):\n    \"\"\"Encode s as character counts: \"aabbbc\" -> \"a2b3c1\".\n    Empty string encodes to \"\".\"\"\"",
+      "tests": [
+        "assert run_length_encode('aabbbc') == 'a2b3c1'",
+        "assert run_length_encode('') == ''",
+        "assert run_length_encode('a') == 'a1'",
+        "assert run_length_encode('abcd') == 'a1b1c1d1'"
+      ],
+      "entry_point": "run_length_encode",
+      "prompt_sha256": "99facecc0dbd7be1d44341d106bfe94c67134beb95d3b88573c9ae7e0ae7cc8b",
+      "tests_sha256": "ee399cf8af81d328c66bcc586f1ae807b97e16ccd24d04a77245e526fb735e4e"
+    },
+    {
+      "id": "heldout_balanced_brackets",
+      "split": "heldout",
+      "prompt": "def balanced_brackets(s):\n    \"\"\"Return True if every () [] {} in s is correctly matched and nested.\"\"\"",
+      "tests": [
+        "assert balanced_brackets('()[]{}') is True",
+        "assert balanced_brackets('([)]') is False",
+        "assert balanced_brackets('') is True",
+        "assert balanced_brackets('(((') is False",
+        "assert balanced_brackets('{[()]}') is True"
+      ],
+      "entry_point": "balanced_brackets",
+      "prompt_sha256": "02f1a94dd025cda822830415c4726604529b6be282baf879a66c4f50dc615f32",
+      "tests_sha256": "0d927eec86a5d8140079f6601b3e68577c2fff45b432e05598982078ab1f624e"
+    },
+    {
+      "id": "heldout_second_largest",
+      "split": "heldout",
+      "prompt": "def second_largest(lst):\n    \"\"\"Return the second largest DISTINCT value in lst,\n    or None if fewer than two distinct values exist.\"\"\"",
+      "tests": [
+        "assert second_largest([1, 2, 3]) == 2",
+        "assert second_largest([10, 10, 9]) == 9",
+        "assert second_largest([7]) is None",
+        "assert second_largest([4, 4, 4]) is None",
+        "assert second_largest([5, 1, 5, 3]) == 3"
+      ],
+      "entry_point": "second_largest",
+      "prompt_sha256": "7676ab431be304b71dee477ccbbadfbbec4be1a67f89766a39cdc48857ec2c1f",
+      "tests_sha256": "a0852e70df2f35a3b6d63f7230b70e014f0cc413adfa29965e89d7ea6d0a1a67"
+    },
+    {
+      "id": "heldout_group_anagrams",
+      "split": "heldout",
+      "prompt": "def group_anagrams(words):\n    \"\"\"Group anagrams together. Return a list of groups; sort each group\n    alphabetically and sort the groups by their first element.\"\"\"",
+      "tests": [
+        "assert group_anagrams(['eat', 'tea', 'tan', 'ate', 'nat', 'bat']) == [['ate', 'eat', 'tea'], ['bat'], ['nat', 'tan']]",
+        "assert group_anagrams([]) == []",
+        "assert group_anagrams(['a']) == [['a']]"
+      ],
+      "entry_point": "group_anagrams",
+      "prompt_sha256": "6a92a5beb8db34cb052908e43be432399baa1083fd271ab2137bf4b12d93231c",
+      "tests_sha256": "603d143d0635b7657c783488c12c263e709f80f03422b32dfbf27052c70e5c76"
+    },
+    {
+      "id": "heldout_pascal_row",
+      "split": "heldout",
+      "prompt": "def pascal_row(n):\n    \"\"\"Return row n (0-indexed) of Pascal's triangle as a list.\"\"\"",
+      "tests": [
+        "assert pascal_row(0) == [1]",
+        "assert pascal_row(1) == [1, 1]",
+        "assert pascal_row(4) == [1, 4, 6, 4, 1]"
+      ],
+      "entry_point": "pascal_row",
+      "prompt_sha256": "3e1390ce8a4f16c8b79dd86bf6dadc64fa64378738d1d905cbc98b0da7966a9a",
+      "tests_sha256": "4b680406951a2755f8de21784a5029574d200492c665c983a1686a6aedaf925e"
+    },
+    {
+      "id": "heldout_longest_common_prefix",
+      "split": "heldout",
+      "prompt": "def longest_common_prefix(strs):\n    \"\"\"Return the longest common prefix of all strings in strs.\n    Empty list -> \"\".\"\"\"",
+      "tests": [
+        "assert longest_common_prefix(['flower', 'flow', 'flight']) == 'fl'",
+        "assert longest_common_prefix([]) == ''",
+        "assert longest_common_prefix(['dog']) == 'dog'",
+        "assert longest_common_prefix(['a', 'b']) == ''"
+      ],
+      "entry_point": "longest_common_prefix",
+      "prompt_sha256": "9b1663bce4285edb3fb514579a139d4ff7ab7479185c8af96445a0bd35945f04",
+      "tests_sha256": "dd52b587660353bd66fbe6e54e11c55f7169463f39469fe06d094470626e57b0"
+    },
+    {
+      "id": "heldout_sieve",
+      "split": "heldout",
+      "prompt": "def sieve(n):\n    \"\"\"Return all prime numbers strictly below n, in ascending order.\"\"\"",
+      "tests": [
+        "assert sieve(10) == [2, 3, 5, 7]",
+        "assert sieve(2) == []",
+        "assert sieve(20) == [2, 3, 5, 7, 11, 13, 17, 19]",
+        "assert sieve(3) == [2]"
+      ],
+      "entry_point": "sieve",
+      "prompt_sha256": "539c504af3f321e4d8237201adb174ac7e06d0ce6e9fb7d5510061c166a34757",
+      "tests_sha256": "e7dfb4efc8388e4525b9715c4700cf56279eaab0aa094e69199564a74625f015"
+    },
+    {
+      "id": "heldout_chunk_list",
+      "split": "heldout",
+      "prompt": "def chunk_list(lst, k):\n    \"\"\"Split lst into consecutive chunks of size k\n    (the last chunk may be smaller).\"\"\"",
+      "tests": [
+        "assert chunk_list([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]",
+        "assert chunk_list([], 3) == []",
+        "assert chunk_list([1, 2], 5) == [[1, 2]]"
+      ],
+      "entry_point": "chunk_list",
+      "prompt_sha256": "64629d750a37bc681a08e9dcbc651d8c68139fb6bceebc31c66ca9450b2263d7",
+      "tests_sha256": "e93f8a5f22e09622a872d09153044ee4d8a2c778b0e25368971ee88197504e71"
+    },
+    {
+      "id": "heldout_most_frequent",
+      "split": "heldout",
+      "prompt": "def most_frequent(lst):\n    \"\"\"Return the most frequent element of lst.\n    Ties are broken by first appearance.\"\"\"",
+      "tests": [
+        "assert most_frequent([1, 2, 2, 3]) == 2",
+        "assert most_frequent([3, 1, 3, 1, 3]) == 3",
+        "assert most_frequent([1, 2, 1, 2]) == 1",
+        "assert most_frequent(['a', 'b', 'a']) == 'a'"
+      ],
+      "entry_point": "most_frequent",
+      "prompt_sha256": "031d1bb4183573c9083999440408246cb5b9ad1bf9005dc3eeed47a9608530ee",
+      "tests_sha256": "b59852e118a872f70c584daec5b3005dbe680bf94339ec04039508be7bd0d904"
+    },
+    {
+      "id": "heldout_interleave",
+      "split": "heldout",
+      "prompt": "def interleave(a, b):\n    \"\"\"Alternate elements of a and b. When one list is longer,\n    append its remaining elements at the end.\"\"\"",
+      "tests": [
+        "assert interleave([1, 2], [3, 4]) == [1, 3, 2, 4]",
+        "assert interleave([1], [2, 3, 4]) == [1, 2, 3, 4]",
+        "assert interleave([], [1]) == [1]",
+        "assert interleave([1, 2], []) == [1, 2]"
+      ],
+      "entry_point": "interleave",
+      "prompt_sha256": "b7730405158fa39c55167287afcf2042f9679f02ee13e550e3ad50a96d9434b6",
+      "tests_sha256": "075ac4ef10ff5584ca6c0285f18364fb0733cc106af2891da19a0fc8462a1067"
+    },
+    {
+      "id": "heldout_digit_sum",
+      "split": "heldout",
+      "prompt": "def digit_sum(n):\n    \"\"\"Return the sum of the decimal digits of n (use absolute value).\"\"\"",
+      "tests": [
+        "assert digit_sum(123) == 6",
+        "assert digit_sum(0) == 0",
+        "assert digit_sum(-45) == 9",
+        "assert digit_sum(999) == 27"
+      ],
+      "entry_point": "digit_sum",
+      "prompt_sha256": "e65dfe83aed6d27cef50c5bd1431c353f9cbe1176e390cfad359615a9216b5e8",
+      "tests_sha256": "f41a351f4db3466e46cecfccc0512d3366dbaca2db7749f183b4211d9d8c89aa"
+    },
+    {
+      "id": "heldout_rotate_right",
+      "split": "heldout",
+      "prompt": "def rotate_right(lst, k):\n    \"\"\"Rotate lst right by k positions. k may exceed len(lst).\n    Return a new list; empty list -> [].\"\"\"",
+      "tests": [
+        "assert rotate_right([1, 2, 3, 4], 1) == [4, 1, 2, 3]",
+        "assert rotate_right([1, 2, 3], 0) == [1, 2, 3]",
+        "assert rotate_right([1, 2, 3], 3) == [1, 2, 3]",
+        "assert rotate_right([1, 2, 3, 4, 5], 7) == [4, 5, 1, 2, 3]",
+        "assert rotate_right([], 3) == []"
+      ],
+      "entry_point": "rotate_right",
+      "prompt_sha256": "5e96d438fa89a089df4f40e35430eaa3d6cbce336353ba72ceb6264d79d773aa",
+      "tests_sha256": "93cb2eb448533026c6ae60c487c140ac4101288393207dd36d60970ad962a9f0"
+    }
+  ],
+  "benchmark_sha256": "a156b8bd081e73153aa73b56b87ed9d628c4fc4e6dccd5042db9c984e1843c6a"
+}
