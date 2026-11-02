@@ -1,0 +1,40 @@
+name: render-never-blink
+on:
+  push:
+    branches: [never-blink-render2]
+  workflow_dispatch:
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: never-blink
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decode assets and check tools
+        run: |
+          cat vendor/three.module.js.part* > vendor/three.module.js
+          cat data/mix.flac.b64.part* | base64 -d > data/mix.flac
+          ffmpeg -y -v error -i data/mix.flac data/mix.wav
+          for p in fonts/*.otf.b64.part00; do b=$(basename "$p" .b64.part00); cat "fonts/$b.b64.part"* | base64 -d > "fonts/$b"; done
+          node --version; ffmpeg -version | head -1
+          (google-chrome --version || google-chrome-stable --version || chromium --version)
+      - name: Render video (full length, software WebGL)
+        env:
+          SOFTWARE_GL: '1'
+        run: node tools/capture.mjs video renders/never-blink.mp4
+      - name: Publish rendered video to output branch
+        working-directory: ${{ github.workspace }}
+        run: |
+          cd never-blink/renders && split -b 3m never-blink.mp4 part- && cd ../..
+          git config user.email "actions@render.bot"
+          git config user.name "render-bot"
+          git switch -c never-blink-output
+          git add never-blink/renders/never-blink.mp4 never-blink/renders/part-*
+          git commit -m "Rendered Never Blink MP4"
+          git push -f origin never-blink-output
